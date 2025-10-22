@@ -11,19 +11,19 @@
 Можно поменять статус задачи и оставить комментарий нажав на кнопку редактирования задачи
 При нажатии на кнопку отправки email на почту ответственного отправляется оповещение о задаче с ссылкой на редактирование.
 
-Для запуска необходим .env файл с настройками сервера
+Для запуска необходим .env файл с настройками сервера:
 
-# SMTP Configuration
-SMTP_HOST="хост, например smtp.mail.ru"
-SMTP_PORT=587
-SMTP_USERNAME="ваш логин"
-SMTP_PASSWORD="ваш пароль"
-SMTP_FROM="почта отправки"
+#SMTP Configuration
+SMTP_HOST="хост, например smtp.mail.ru" 
+SMTP_PORT=587 
+SMTP_USERNAME="ваш логин" 
+SMTP_PASSWORD="ваш пароль" 
+SMTP_FROM="почта отправки" 
 
-# Server Configuration
+#Server Configuration
 SERVER_HOST=localhost:8700
 
-# Database Configuration
+#Database Configuration
 DB_PATH=./tasks.db
 
 v0.1.0
