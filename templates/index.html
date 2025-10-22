@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Management System</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Task Management System</h1>
+        
+        <!-- Форма загрузки файла -->
+        <div class="upload-section">
+            <h2>Upload XLSX File</h2>
+            <form action="/upload" method="post" enctype="multipart/form-data">
+                <input type="file" name="file" accept=".xlsx" required>
+                <button type="submit">Upload</button>
+            </form>
+        </div>
+
+        <!-- Фильтры -->
+        <div class="filters">
+            <h2>Tasks Filter</h2>
+            <form id="filterForm">
+                <label>
+                    Status:
+                    <select name="status" id="statusFilter">
+                        <option value="все">All</option>
+                        <option value="в работе" selected>In Progress</option>
+                        <option value="готово">Done</option>
+                        <option value="отменено">Cancelled</option>
+                    </select>
+                </label>
+                <label>
+                    Period (days):
+                    <input type="number" name="days" id="daysFilter" value="7" min="1">
+                </label>
+                <button type="button" onclick="applyFilters()">Apply Filters</button>
+            </form>
+        </div>
+
+        <!-- Список задач -->
+        <div class="tasks-section">
+            <h2>Tasks</h2>
+            <div id="tasksList">
+                <!-- Tasks will be loaded here via JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Функция для нормализации названий полей
+        function normalizeTaskFields(task) {
+            if (!task) return {};
+            
+            return {
+                id: task.id || task.ID,
+                meetingDate: task.meetingDate || task.meeting_date,
+                taskNumber: task.taskNumber || task.task_number,
+                taskText: task.taskText || task.task_text,
+                responsibles: task.responsibles,
+                deadline: task.deadline,
+                comment: task.comment,
+                status: task.status,
+                statusDate: task.statusDate || task.status_date
+            };
+        }
+
+        function applyFilters() {
+            const status = document.getElementById('statusFilter').value;
+            const days = document.getElementById('daysFilter').value;
+            
+            fetch(`/tasks?status=${status}&days=${days}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(tasks => {
+                    displayTasks(tasks);
+                })
+                .catch(error => {
+                    console.error('Error fetching tasks:', error);
+                    alert('Error loading tasks: ' + error.message);
+                });
+        }
+
+        function displayTasks(tasks) {
+            const tasksList = document.getElementById('tasksList');
+            
+            if (!tasks || tasks.length === 0) {
+                tasksList.innerHTML = '<p>No tasks found</p>';
+                return;
+            }
+
+            tasksList.innerHTML = tasks.map(task => {
+                const normalizedTask = normalizeTaskFields(task);
+                
+                return `
+                    <div class="task-item ${getTaskColor(normalizedTask)}" data-task-id="${normalizedTask.id}">
+                        <div class="task-header">
+                            <h3>${escapeHtml(normalizedTask.taskText || 'No title')}</h3>
+                            <span class="task-number">#${normalizedTask.id || 'N/A'}</span>
+                        </div>
+                        <div class="task-details">
+                            <p><strong>Meeting Date:</strong> ${escapeHtml(formatDisplayDate(normalizedTask.meetingDate) || 'N/A')}</p>
+                            <p><strong>Responsibles:</strong> ${escapeHtml(normalizedTask.responsibles || 'N/A')}</p>
+                            <p><strong>Deadline:</strong> ${escapeHtml(formatDisplayDate(normalizedTask.deadline) || 'N/A')}</p>
+                            <p><strong>Status:</strong> ${escapeHtml(normalizedTask.status || 'N/A')}</p>
+                            <p><strong>Last Updated:</strong> ${formatDate(normalizedTask.statusDate) || 'N/A'}</p>
+                            ${normalizedTask.comment ? `<p><strong>Comment:</strong> ${escapeHtml(normalizedTask.comment)}</p>` : ''}
+                        </div>
+                        <div class="task-actions">
+                            <button onclick="editTask(${normalizedTask.id})">Edit</button>
+                            <button onclick="sendEmail(${normalizedTask.id})">Send Email</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function getTaskColor(task) {
+            const normalizedTask = normalizeTaskFields(task);
+            
+            if (normalizedTask.status === 'отменено') return 'task-cancelled';
+            if (normalizedTask.status === 'готово') return 'task-done';
+            
+            try {
+                const deadline = parseDate(normalizedTask.deadline);
+                if (!deadline) return 'task-ok';
+                
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                
+                const diffTime = deadline - today;
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                
+                if (diffDays > 1) return 'task-ok';
+                if (diffDays === 1 || diffDays === 0) return 'task-warning';
+                return 'task-danger';
+            } catch (e) {
+                return 'task-ok';
+            }
+        }
+
+        function parseDate(dateStr) {
+            if (!dateStr) return null;
+            
+            const formats = [
+                /(\d{2})\.(\d{2})\.(\d{4})/, // DD.MM.YYYY
+                /(\d{4})-(\d{2})-(\d{2})/,   // YYYY-MM-DD
+            ];
+            
+            for (const format of formats) {
+                const match = dateStr.match(format);
+                if (match) {
+                    if (format === formats[0]) {
+                        return new Date(match[3], match[2] - 1, match[1]);
+                    } else {
+                        return new Date(match[1], match[2] - 1, match[3]);
+                    }
+                }
+            }
+            
+            const date = new Date(dateStr);
+            return isNaN(date.getTime()) ? null : date;
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return 'N/A';
+            try {
+                const date = new Date(dateStr);
+                return date.toLocaleDateString('ru-RU');
+            } catch (e) {
+                return dateStr;
+            }
+        }
+
+        function formatDisplayDate(dateStr) {
+            if (!dateStr) return 'N/A';
+            try {
+                // Конвертируем в формат DD.MM.YYYY
+                const date = new Date(dateStr);
+                const day = date.getDate().toString().padStart(2, '0');
+                const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                const year = date.getFullYear();
+                return `${day}.${month}.${year}`;
+            } catch (e) {
+                return dateStr;
+            }
+        }
+
+        function editTask(id) {
+            if (!id || id === 'N/A') {
+                alert('Invalid task ID');
+                return;
+            }
+            window.location.href = `/edit/${id}`;
+        }
+
+        function sendEmail(id) {
+            if (!id || id === 'N/A') {
+                alert('Invalid task ID');
+                return;
+            }
+            fetch(`/send-email/${id}`, { method: 'POST' })
+                .then(response => response.text())
+                .then(message => {
+                    alert(message);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error sending email: ' + error.message);
+                });
+        }
+
+        function escapeHtml(unsafe) {
+            if (unsafe === null || unsafe === undefined) return '';
+            return unsafe
+                .toString()
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // Load initial tasks (In Progress by default)
+        document.addEventListener('DOMContentLoaded', function() {
+            applyFilters();
+        });
+    </script>
+</body>
+</html>

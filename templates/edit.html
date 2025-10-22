@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Task</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .comment-textarea {
+            width: 100%;
+            min-width: 500px;
+            min-height: 150px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            font-family: Arial, sans-serif;
+            resize: vertical;
+        }
+        .task-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .task-info p {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Edit Task</h1>
+        <a href="/">← Back to tasks</a>
+
+        <div class="task-info">
+            <h2>Task Details</h2>
+            <p><strong>Task Text:</strong> {{.TaskText}}</p>
+            <p><strong>Responsibles:</strong> {{.Responsibles}}</p>
+            <p><strong>Deadline:</strong> <span id="deadlineDate">{{.Deadline}}</span></p>
+            <p><strong>Meeting Date:</strong> <span id="meetingDate">{{.MeetingDate}}</span></p>
+        </div>
+
+        <form action="/update/{{.ID}}" method="post" class="edit-form">
+            <div class="form-group">
+                <label for="status">Status:</label>
+                <select name="status" id="status" required>
+                    <option value="в работе" {{if eq .Status "в работе"}}selected{{end}}>In Progress</option>
+                    <option value="готово" {{if eq .Status "готово"}}selected{{end}}>Done</option>
+                    <option value="отменено" {{if eq .Status "отменено"}}selected{{end}}>Cancelled</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="comment">Comment:</label>
+                <textarea name="comment" id="comment" class="comment-textarea">{{.Comment}}</textarea>
+            </div>
+
+            <button type="submit">Update Task</button>
+        </form>
+    </div>
+
+    <script>
+        // Функция для форматирования даты в DD.MM.YYYY
+        function formatDate(dateStr) {
+            if (!dateStr) return 'N/A';
+            try {
+                // Пробуем разные форматы
+                let date;
+                
+                // Формат DD.MM.YYYY
+                if (dateStr.match(/\d{2}\.\d{2}\.\d{4}/)) {
+                    const parts = dateStr.split('.');
+                    date = new Date(parts[2], parts[1] - 1, parts[0]);
+                } 
+                // Формат YYYY-MM-DD
+                else if (dateStr.match(/\d{4}-\d{2}-\d{2}/)) {
+                    const parts = dateStr.split('-');
+                    date = new Date(parts[0], parts[1] - 1, parts[2]);
+                }
+                // Формат с временем YYYY-MM-DD HH:MM:SS
+                else if (dateStr.match(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/)) {
+                    const parts = dateStr.split(' ')[0].split('-');
+                    date = new Date(parts[0], parts[1] - 1, parts[2]);
+                }
+                // Пробуем стандартный парсинг
+                else {
+                    date = new Date(dateStr);
+                }
+                
+                if (isNaN(date.getTime())) {
+                    return dateStr;
+                }
+                
+                const day = date.getDate().toString().padStart(2, '0');
+                const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                const year = date.getFullYear();
+                return `${day}.${month}.${year}`;
+            } catch (e) {
+                console.error('Error formatting date:', dateStr, e);
+                return dateStr;
+            }
+        }
+
+        // Форматируем даты при загрузке страницы
+        document.addEventListener('DOMContentLoaded', function() {
+            const deadlineElement = document.getElementById('deadlineDate');
+            const meetingDateElement = document.getElementById('meetingDate');
+            
+            if (deadlineElement) {
+                const formattedDate = formatDate(deadlineElement.textContent);
+                deadlineElement.textContent = formattedDate;
+            }
+            if (meetingDateElement) {
+                const formattedDate = formatDate(meetingDateElement.textContent);
+                meetingDateElement.textContent = formattedDate;
+            }
+        });
+    </script>
+</body>
+</html>
